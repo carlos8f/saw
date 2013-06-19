@@ -1,0 +1,27 @@
+{
+  "name": "saw",
+  "version": "0.0.0",
+  "description": "no-frills file tree watching library",
+  "main": "index.js",
+  "dependencies": {},
+  "devDependencies": {
+    "mocha": "*",
+    "mkdirp": "~0.3.5",
+    "rimraf": "~2.1.4",
+    "idgen": "~1.2.0"
+  },
+  "scripts": {
+    "test": "make test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/carlos8f/saw.git"
+  },
+  "homepage": "https://github.com/carlos8f/saw",
+  "keywords": [
+    "file",
+    "watcher"
+  ],
+  "author": "Carlos Rodriguez <carlos@s8f.org> (http://s8f.org/)",
+  "license": "MIT"
+}
