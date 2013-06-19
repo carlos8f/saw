@@ -5,3 +5,4 @@ mkdirp = require('mkdirp');
 rimraf = require('rimraf');
 idgen = require('idgen');
 fs = require('fs');
+path = require('path');
