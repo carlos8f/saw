@@ -8,14 +8,21 @@ module.exports = function readDir (startDir, options, cb) {
     options = {};
   }
   options || (options = {});
-  if (typeof options.mark === 'undefined') options.mark = true;
 
   var ret = []
     , latch = 0
 
-  function addFile (file, isDir) {
-    if (options.mark && isDir) file += path.sep;
-    ret.push(file);
+  function addFile (file, stat) {
+    if (options.mark && stat.isDirectory()) file += path.sep;
+    if (options.stat) {
+      ret.push({
+        path: file,
+        stat: stat
+      });
+    }
+    else {
+      ret.push(file);
+    }
   }
 
   (function read (dir) {
@@ -29,11 +36,11 @@ module.exports = function readDir (startDir, options, cb) {
         fs.stat(file, function (err, stat) {
           if (err) return cb(err);
           if (stat.isDirectory()) {
-            addFile(file, true);
+            addFile(file, stat);
             read(file);
           }
           else {
-            addFile(file, false);
+            addFile(file, stat);
           }
           if (!--latch) cb(null, ret);
         });
