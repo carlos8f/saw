@@ -17,6 +17,7 @@ function saw (dir, options) {
   var emitter = new EventEmitter()
     , cache = {}
     , ready = false
+    , scanNum = 0
 
   if (options.delay) {
     var batch = batcher({
@@ -59,14 +60,16 @@ function saw (dir, options) {
   }
 
   function scan () {
+    var num = ++scanNum;
     var keys = [];
-    // copy cache for later comparison
-    var lastFiles = Object.keys(cache).map(function (k) {
-      return cache[k];
-    });
 
     readDir(dir, {stat: true}, function (err, files) {
       if (err) return onErr(err);
+      if (num !== scanNum) return; // there is a new scan running, abort
+      // copy cache for later comparison
+      var lastFiles = Object.keys(cache).map(function (k) {
+        return cache[k];
+      });
       files.forEach(function (file) {
         var key = cacheKey(file);
         keys.push(key);
@@ -101,10 +104,10 @@ function saw (dir, options) {
   }
 
   emitter.close = function () {
-    emitter._watcher.close();
+    emitter.watcher.close();
   };
 
-  emitter._watcher = createWatcher(dir);
+  emitter.watcher = createWatcher(dir);
   process.nextTick(onChange);
 
   return emitter;
