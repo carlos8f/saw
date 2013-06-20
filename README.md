@@ -5,6 +5,36 @@ no-frills file tree watching library
 
 [![build status](https://secure.travis-ci.org/carlos8f/saw.png)](http://travis-ci.org/carlos8f/saw)
 
+Watch for changes in a file tree. I wrote this because I tried virtually every
+other "watcher" library on npm and none were totally reliable. Many were extremely
+over-engineered. This implementation works for me and is simple enough to grok.
+Enjoy.
+
+## Usage
+
+```js
+var saw = require('saw');
+
+saw('path/to/dir')
+  .on('ready', function () {
+    // watcher is active
+  })
+  .on('add', function (p, stat) {
+    // file or dir at path `p` was added
+    // `stat` is an instance of `fs.Stats`
+  })
+  .on('remove', function (p, stat) {
+    // same for removal
+  })
+  .on('update', function (p, stat) {
+    // same for update
+  })
+  .on('all', function (ev, p, stat) {
+    // catchall - `ev` is the event name.
+  })
+  // to unwatch all files, call close():
+  .close()
+
 - - -
 
 ### Developed by [Terra Eclipse](http://www.terraeclipse.com)
