@@ -17,6 +17,7 @@ function saw (dir, options) {
   var emitter = new EventEmitter()
     , cache = {}
     , ready = false
+    , watchers = {}
 
   if (options.delay) {
     var batch = batcher({
@@ -58,8 +59,6 @@ function saw (dir, options) {
     }
     catch (err) {
       onErr(err);
-      // not worth watching a file that no longer exists. graceful.
-      return false;
     }
   }
 
@@ -74,11 +73,11 @@ function saw (dir, options) {
         keys.push(key);
 
         if (typeof cache[key] === 'undefined') {
-          emitter.emit('add', file.fullPath, file.stat);
-          emitter.emit('all', 'add', file.fullPath, file.stat);
-          if (file.stat.isDirectory()) {
-            file.watcher = createWatcher(file.fullPath);
+          if (ready) {
+            emitter.emit('add', file.fullPath, file.stat);
+            emitter.emit('all', 'add', file.fullPath, file.stat);
           }
+          watchers[key] = createWatcher(file.fullPath);
         }
         else if (cache[key].stat.mtime.getTime() !== file.stat.mtime.getTime()) {
           emitter.emit('update', file.fullPath, file.stat);
@@ -95,7 +94,10 @@ function saw (dir, options) {
         if (!~keys.indexOf(key)) {
           emitter.emit('remove', file.fullPath, file.stat);
           emitter.emit('all', 'remove', file.fullPath, file.stat);
-          if (file.watcher) file.watcher.close();
+          if (watchers[key]) {
+            watchers[key].close();
+            delete watchers[key];
+          }
           delete cache[key];
         }
       });
@@ -109,14 +111,12 @@ function saw (dir, options) {
 
   emitter.close = function () {
     // unwatch all
-    emitter.watcher.close();
-    Object.keys(cache).forEach(function (k) {
-      if (cache[k].watcher) cache[k].watcher.close();
+    Object.keys(watchers).forEach(function (k) {
+      watchers[k].close();
     });
-    cache = {};
   };
 
-  emitter.watcher = createWatcher(dir);
+  watchers['file:' + dir + sep] = createWatcher(dir);
   process.nextTick(onChange);
 
   return emitter;

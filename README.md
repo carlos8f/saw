@@ -31,7 +31,7 @@ Moreover, npm-level watching libraries that attempt to remedy the above have
 annoying caveats, such as:
 
 1. Events aren't emitted in some cases, especially relating to subdirectories
-2. Events are duplicated in some cases
+2. Events are duplicated in some cases (`fs.watch()` is also guilty of this)
 3. Poor error handling such as not accounting for ENOFILE (race condition from
    deletion) or EMFILE (large directory trees)
 4. Deletes of directories poorly handled -- you might get notified that a directory
@@ -48,7 +48,7 @@ annoying caveats, such as:
 `saw` takes a very simple and reliable approach which consists of:
 
 1. Recursing through the directory given
-2. Applying `fs.watch()` to any directories found
+2. Applying `fs.watch()` to all files
 3. Caching `fs.Stats` instances for all files
 4. Comparing the file tree with the last scan (if available) and emitting events
    based on the difference
