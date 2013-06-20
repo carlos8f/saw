@@ -74,14 +74,14 @@ function saw (dir, options) {
 
         if (typeof cache[key] === 'undefined') {
           if (ready) {
-            emitter.emit('add', file.fullPath, file.stat);
-            emitter.emit('all', 'add', file.fullPath, file.stat);
+            emitter.emit('add', file);
+            emitter.emit('all', 'add', file);
           }
           watchers[key] = createWatcher(file.fullPath);
         }
         else if (cache[key].stat.mtime.getTime() !== file.stat.mtime.getTime()) {
-          emitter.emit('update', file.fullPath, file.stat);
-          emitter.emit('all', 'update', file.fullPath, file.stat);
+          emitter.emit('update', file);
+          emitter.emit('all', 'update', file);
         }
 
         cache[key] = file;
@@ -92,8 +92,8 @@ function saw (dir, options) {
         var file = cache[key];
 
         if (!~keys.indexOf(key)) {
-          emitter.emit('remove', file.fullPath, file.stat);
-          emitter.emit('all', 'remove', file.fullPath, file.stat);
+          emitter.emit('remove', file);
+          emitter.emit('all', 'remove', file);
           if (watchers[key]) {
             watchers[key].close();
             delete watchers[key];

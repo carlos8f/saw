@@ -62,24 +62,33 @@ var saw = require('saw');
 
 saw('path/to/dir', {options: 'are optional'})
   .on('ready', function (files) {
-    // watcher is active. `files` is an array of info about watched files.
+    // watcher is active. `files` is an array of file objects (details below).
   })
-  .on('add', function (p, stat) {
-    // file or dir at path `p` was added
-    // `stat` is an instance of `fs.Stats`
+  .on('add', function (file) {
+    // `file.path` = relative path from root dir
+    // `file.fullPath` = absolute path
+    // `file.name` = file name
+    // `file.stat` = instance of `fs.Stats`
+    // `file.parentDir` = relative parent dir
+    // `file.fullParentDir` = absolute parent dir
   })
-  .on('remove', function (p, stat) {
-    // same for removal
+  .on('remove', function (file) {
+    // file was removed
   })
-  .on('update', function (p, stat) {
-    // same for update
+  .on('update', function (file) {
+    // file was updated
+    // caveat: updates within a millisecond after the file was added or updated
+    // can't be detected
   })
-  .on('all', function (ev, p, stat) {
+  .on('all', function (ev, file) {
     // catchall - `ev` is the event name.
   })
   // to unwatch all files, call close():
   .close()
 ```
+
+The `file` object is the same as returned by
+[readdirp](https://github.com/thlorenz/readdirp#entry-info).
 
 ## Options
 

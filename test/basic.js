@@ -22,6 +22,12 @@ describe('basic test', function () {
     return !stat.isDirectory();
   }
 
+  function matchEntry (p, statMatcher) {
+    return function (file) {
+      return file.fullPath === testDir + '/' + p && statMatcher(file.stat);
+    };
+  }
+
   beforeEach(function() {
     [s, s2].forEach(function (s) {
       if (s) {
@@ -55,7 +61,7 @@ describe('basic test', function () {
     fs.writeFile(testDir + '/beans', 'beans', assert.ifError);
     wait(function () {
       assertCalledOnce(s.onAdd);
-      assertCalledWithMatch(s.onAdd, testDir + '/beans', isFile);
+      assertCalledWithMatch(s.onAdd, matchEntry('beans', isFile));
       assertNotCalled(s.onUpdate);
       assertNotCalled(s.onRemove);
       done();
@@ -65,8 +71,8 @@ describe('basic test', function () {
     mkdirp(testDir + '/rice/beans');
     wait(function () {
       assertCalledTwice(s.onAdd);
-      assertCalledWithMatch(s.onAdd, testDir + '/rice', isDir);
-      assertCalledWithMatch(s.onAdd, testDir + '/rice/beans', isDir);
+      assertCalledWithMatch(s.onAdd, matchEntry('rice', isDir));
+      assertCalledWithMatch(s.onAdd, matchEntry('rice/beans', isDir));
       assertNotCalled(s.onUpdate);
       assertNotCalled(s.onRemove);
       done();
@@ -76,9 +82,9 @@ describe('basic test', function () {
     fs.writeFile(testDir + '/rice/beans/meat', 'meat is neat', assert.ifError);
     wait(function () {
       assertCalledOnce(s.onAdd);
-      assertCalledWithMatch(s.onAdd, testDir + '/rice/beans/meat', isFile);
+      assertCalledWithMatch(s.onAdd, matchEntry('rice/beans/meat', isFile));
       assertCalledOnce(s.onUpdate);
-      assertCalledWithMatch(s.onUpdate, testDir + '/rice/beans', isDir);
+      assertCalledWithMatch(s.onUpdate, matchEntry('rice/beans', isDir));
       assertNotCalled(s.onRemove);
       done();
     });
@@ -87,9 +93,9 @@ describe('basic test', function () {
     fs.writeFile(testDir + '/rice/taters', 'tater treats', assert.ifError);
     wait(function () {
       assertCalledOnce(s.onAdd);
-      assertCalledWithMatch(s.onAdd, testDir + '/rice/taters', isFile);
+      assertCalledWithMatch(s.onAdd, matchEntry('rice/taters', isFile));
       assertCalledOnce(s.onUpdate);
-      assertCalledWithMatch(s.onUpdate, testDir + '/rice', isDir);
+      assertCalledWithMatch(s.onUpdate, matchEntry('rice', isDir));
       assertNotCalled(s.onRemove);
       done();
     });
@@ -98,7 +104,7 @@ describe('basic test', function () {
     fs.unlink(testDir + '/beans', assert.ifError);
     wait(function () {
       assertCalledOnce(s.onRemove);
-      assertCalledWithMatch(s.onRemove, testDir + '/beans', isFile);
+      assertCalledWithMatch(s.onRemove, matchEntry('beans', isFile));
       assertNotCalled(s.onAdd);
       assertNotCalled(s.onUpdate);
       done();
@@ -108,9 +114,9 @@ describe('basic test', function () {
     mkdirp(testDir + '/bugs/sauce/turmoil');
     wait(function () {
       assertCalledThrice(s.onAdd);
-      assertCalledWithMatch(s.onAdd, testDir + '/bugs', isDir);
-      assertCalledWithMatch(s.onAdd, testDir + '/bugs/sauce', isDir);
-      assertCalledWithMatch(s.onAdd, testDir + '/bugs/sauce/turmoil', isDir);
+      assertCalledWithMatch(s.onAdd, matchEntry('bugs', isDir));
+      assertCalledWithMatch(s.onAdd, matchEntry('bugs/sauce', isDir));
+      assertCalledWithMatch(s.onAdd, matchEntry('bugs/sauce/turmoil', isDir));
       assertNotCalled(s.onUpdate);
       assertNotCalled(s.onRemove);
       done();
@@ -140,7 +146,7 @@ describe('basic test', function () {
     wait(function () {
       [s, s2].forEach(function (s) {
         assertCalledOnce(s.onUpdate);
-        assertCalledWithMatch(s.onUpdate, testDir + '/rice/beans/meat', isFile);
+        assertCalledWithMatch(s.onUpdate, matchEntry('rice/beans/meat', isFile));
         assertNotCalled(s.onAdd);
         assertNotCalled(s.onRemove);
       });
@@ -152,10 +158,10 @@ describe('basic test', function () {
     wait(function () {
       [s, s2].forEach(function (s) {
         assert.equal(s.onRemove.callCount, 4);
-        assertCalledWithMatch(s.onRemove, testDir + '/rice', isDir);
-        assertCalledWithMatch(s.onRemove, testDir + '/rice/beans', isDir);
-        assertCalledWithMatch(s.onRemove, testDir + '/rice/beans/meat', isFile);
-        assertCalledWithMatch(s.onRemove, testDir + '/rice/taters', isFile);
+        assertCalledWithMatch(s.onRemove, matchEntry('rice', isDir));
+        assertCalledWithMatch(s.onRemove, matchEntry('rice/beans', isDir));
+        assertCalledWithMatch(s.onRemove, matchEntry('rice/beans/meat', isFile));
+        assertCalledWithMatch(s.onRemove, matchEntry('rice/taters', isFile));
         assertNotCalled(s.onAdd);
         assertNotCalled(s.onUpdate);
       });
@@ -167,9 +173,9 @@ describe('basic test', function () {
     wait(function () {
       [s, s2].forEach(function (s) {
         assertCalledOnce(s.onRemove);
-        assertCalledWithMatch(s.onRemove, testDir + '/bugs/sauce/turmoil', isDir);
+        assertCalledWithMatch(s.onRemove, matchEntry('bugs/sauce/turmoil', isDir));
         assertCalledOnce(s.onUpdate);
-        assertCalledWithMatch(s.onUpdate, testDir + '/bugs/sauce', isDir);
+        assertCalledWithMatch(s.onUpdate, matchEntry('bugs/sauce', isDir));
         assertNotCalled(s.onAdd);
       });
       done();
@@ -180,8 +186,8 @@ describe('basic test', function () {
     wait(function () {
       [s, s2].forEach(function (s) {
         assertCalledTwice(s.onAdd);
-        assertCalledWithMatch(s.onAdd, testDir + '/rice', isDir);
-        assertCalledWithMatch(s.onAdd, testDir + '/rice/taters', isDir);
+        assertCalledWithMatch(s.onAdd, matchEntry('rice', isDir));
+        assertCalledWithMatch(s.onAdd, matchEntry('rice/taters', isDir));
         assertNotCalled(s.onUpdate);
         assertNotCalled(s.onRemove);
       });
