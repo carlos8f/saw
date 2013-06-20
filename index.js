@@ -1,94 +1,111 @@
-var fs = require('fs')
+var fs = require('graceful-fs')
   , path = require('path')
   , EventEmitter = require('events').EventEmitter
+  , batcher = require('batcher')
+  , readDir = require('./readDir')
 
-function saw (dir) {
-  var emitter = new EventEmitter();
-  if (!dir) dir = process.cwd();
-  var cache = {};
-  var ready = false;
-  (function scan () {
-    function done () {
+function saw (dir, options) {
+  if (typeof dir === 'object') {
+    options = dir;
+    dir = null;
+  }
+  dir || (dir = process.cwd());
+  options || (options = {});
+  options.delay || (options.delay = 0);
+  options.delayLimit || (options.delayLimit = 100);
+
+  var emitter = new EventEmitter()
+    , cache = {}
+    , ready = false
+
+  if (options.delay) {
+    var batch = batcher({
+      batchSize: options.delayLimit,
+      batchTimeMs: options.delay
+    });
+    batch
+      .on('data', scan)
+      .on('error', emitter.emit.bind(emitter, 'error'))
+      .resume()
+  }
+
+  function onErr (err) {
+    emitter.emit('error', err);
+  }
+
+  function cacheKey (file) {
+    return 'file:' + file.path + (file.stat.isDirectory() ? path.sep : '');
+  }
+
+  function onChange () {
+    if (options.delay) batch.write(null);
+    else scan();
+  }
+
+  function createWatcher (p) {
+    function onErr (err) {
+      if (err.code !== 'ENOENT') emitter.emit('error', err);
+    }
+    try {
+      return fs.watch(p, {persistent: options.persistent})
+        .on('change', onChange)
+        .on('error', onErr)
+    }
+    catch (err) {
+      onErr(err);
+      // not worth watching a file that no longer exists. graceful.
+      return false;
+    }
+  }
+
+  function scan () {
+    var keys = [];
+    // copy cache for later comparison
+    var lastFiles = Object.keys(cache).map(function (k) {
+      return cache[k];
+    });
+
+    readDir(dir, {stat: true}, function (err, files) {
+      if (err) return onErr(err);
+      files.forEach(function (file) {
+        var key = cacheKey(file);
+        keys.push(key);
+
+        if (typeof cache[key] === 'undefined') {
+          emitter.emit('add', file.path, file.stat);
+          if (file.stat.isDirectory()) {
+            file.watcher = createWatcher(file.path);
+          }
+        }
+        else if (cache[key].stat.mtime.getTime() !== file.stat.mtime.getTime()) {
+          emitter.emit('update', file.path, file.stat);
+        }
+        cache[key] = file;
+      });
+
+      // see if any previously seen files are missing from the tree
+      lastFiles.forEach(function (file) {
+        var key = cacheKey(file);
+        if (!~keys.indexOf(key)) {
+          emitter.emit('remove', file.path, file.stat);
+          if (file.watcher) file.watcher.close();
+          delete cache[key];
+        }
+      });
+
       if (!ready) {
         ready = true;
         emitter.emit('ready');
       }
-    }
-    function onErr (err) {
-      emitter.emit('error', err);
-    }
+    });
+  }
 
-    var latch = 0;
-    (function catalog (file) {
-      var c = cache['file:' + file]
-        , isNew
+  emitter.close = function () {
+    emitter._watcher.close();
+  };
 
-      if (typeof c === 'undefined') {
-        isNew = true;
-        c = cache['file:' + file] = {
-          mtime: null,
-          contents: null,
-          isDir: null
-        };
-      }
-
-      // recursive readDir
-      function readDir (cb) {
-        (function read (dir) {
-          fs.readDir(dir, function (err, files) {
-            if (err) return onErr(err);
-            files = files.map(function (f) {
-              return path.join(file, f);
-            });
-            
-          });
-        })(file);
-      }
-
-      latch++;
-      fs.stat(file, function (err, stat) {
-        if (err) return onErr(err);
-        c.mtime = stat.mtime.getTime();
-        if (stat.isDirectory()) {
-          c.isDir = true;
-          if (isNew) {
-            emitter.emit('add', file, c.isDir);
-            // watch this dir
-            fs.watch(file, scan);
-          }
-          readDir(function (err, files) {
-            if (err) return onErr(err);
-            
-            console.log('files', file, files);
-            (function remove (c) {
-              if (c.contents) {
-                console.log('prev', file, c.contents);
-                // detect remove
-                c.contents.forEach(function (file) {
-                  var sub = cache['file:' + file];
-                  if (sub) remove(sub);
-                  if (!~files.indexOf(file)) {
-                    var r = cache['file:' + file];
-                    emitter.emit('remove', file, r.isDir);
-                  }
-                });
-              }
-            })(c);
-            c.contents = files;
-            files.forEach(catalog);
-            if (!--latch) done();
-          });
-        }
-        else {
-          c.isDir = false;
-          if (isNew) {
-            emitter.emit('add', file, c.isDir);
-          }
-          if (!--latch) done();
-        }
-      });
-    })(dir);
-  })();
+  emitter._watcher = createWatcher(dir);
+  process.nextTick(onChange);
 
   return emitter;
 }

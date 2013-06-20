@@ -3,7 +3,10 @@
   "version": "0.0.0",
   "description": "no-frills file tree watching library",
   "main": "index.js",
-  "dependencies": {},
+  "dependencies": {
+    "batcher": "0.0.2",
+    "graceful-fs": "~1.2.2"
+  },
   "devDependencies": {
     "mocha": "*",
     "mkdirp": "~0.3.5",

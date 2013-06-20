@@ -4,5 +4,5 @@ saw = require('../');
 mkdirp = require('mkdirp');
 rimraf = require('rimraf');
 idgen = require('idgen');
-fs = require('fs');
+fs = require('graceful-fs');
 path = require('path');
