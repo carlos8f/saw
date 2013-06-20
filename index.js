@@ -17,7 +17,6 @@ function saw (dir, options) {
   var emitter = new EventEmitter()
     , cache = {}
     , ready = false
-    , scanNum = 0
 
   if (options.delay) {
     var batch = batcher({
@@ -65,17 +64,11 @@ function saw (dir, options) {
   }
 
   function scan () {
-    var num = ++scanNum;
     var keys = [];
 
     readdirp({root: dir}, function (errors, res) {
       if (errors) return onErr(errors);
-      if (num !== scanNum) return; // there is a new scan running, abort
       var files = res.directories.concat(res.files);
-      // copy cache for later comparison
-      var lastFiles = Object.keys(cache).map(function (k) {
-        return cache[k];
-      });
       files.forEach(function (file) {
         var key = cacheKey(file);
         keys.push(key);
@@ -91,12 +84,14 @@ function saw (dir, options) {
           emitter.emit('update', file.fullPath, file.stat);
           emitter.emit('all', 'update', file.fullPath, file.stat);
         }
+
         cache[key] = file;
       });
 
       // see if any previously seen files are missing from the tree
-      lastFiles.forEach(function (file) {
-        var key = cacheKey(file);
+      Object.keys(cache).forEach(function (key) {
+        var file = cache[key];
+
         if (!~keys.indexOf(key)) {
           emitter.emit('remove', file.fullPath, file.stat);
           emitter.emit('all', 'remove', file.fullPath, file.stat);
