@@ -76,12 +76,14 @@ function saw (dir, options) {
 
         if (typeof cache[key] === 'undefined') {
           emitter.emit('add', file.path, file.stat);
+          emitter.emit('all', 'add', file.path, file.stat);
           if (file.stat.isDirectory()) {
             file.watcher = createWatcher(file.path);
           }
         }
         else if (cache[key].stat.mtime.getTime() !== file.stat.mtime.getTime()) {
           emitter.emit('update', file.path, file.stat);
+          emitter.emit('all', 'update', file.path, file.stat);
         }
         cache[key] = file;
       });
@@ -91,6 +93,7 @@ function saw (dir, options) {
         var key = cacheKey(file);
         if (!~keys.indexOf(key)) {
           emitter.emit('remove', file.path, file.stat);
+          emitter.emit('all', 'remove', file.path, file.stat);
           if (file.watcher) file.watcher.close();
           delete cache[key];
         }
@@ -104,7 +107,12 @@ function saw (dir, options) {
   }
 
   emitter.close = function () {
+    // unwatch all
     emitter.watcher.close();
+    Object.keys(cache).forEach(function (k) {
+      if (cache[k].watcher) cache[k].watcher.close();
+    });
+    cache = {};
   };
 
   emitter.watcher = createWatcher(dir);
