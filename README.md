@@ -48,12 +48,12 @@ annoying caveats, such as:
 `saw` takes a very simple and reliable approach which consists of:
 
 1. Recursing through the directory given
-2. Applying `fs.watch()` to all files
+2. Applying `fs.watch()` to all newly detected files
 3. Caching `fs.Stats` instances for all files
 4. Comparing the file tree with the last scan (if available) and emitting events
    based on the difference
-5. Performing steps 1-4 when **any** of the watchers trigger. This is because
-   `fs.watch()` does not reliably report filenames of what changed.
+5. Performing steps 1-4 on the changed dir (or parent of the changed file) when
+   `fs.watch()` triggers an event.
 
 ## Usage
 
