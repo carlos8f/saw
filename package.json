@@ -1,7 +1,7 @@
 {
   "name": "saw",
   "version": "0.2.1",
-  "description": "no-frills file tree watching library",
+  "description": "actually working file tree watching library",
   "main": "index.js",
   "dependencies": {
     "batcher": "0.0.2",
@@ -24,7 +24,10 @@
   "homepage": "https://github.com/carlos8f/saw",
   "keywords": [
     "file",
-    "watcher"
+    "watcher",
+    "watch",
+    "directory",
+    "change"
   ],
   "author": "Carlos Rodriguez <carlos@s8f.org> (http://s8f.org/)",
   "license": "MIT"
