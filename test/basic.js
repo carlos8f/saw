@@ -1,7 +1,29 @@
 describe('basic test', function () {
   var testDir = '/tmp/saw-test-' + idgen()
     , s
+    , onAll = sinon.spy()
+    , onAdd = sinon.spy()
+    , onUpdate = sinon.spy()
+    , onRemove = sinon.spy()
+    , onError = sinon.spy()
 
+  function wait (cb) {
+    setTimeout(cb, 1000);
+  }
+
+  function isDir (stat) {
+    return stat.isDirectory();
+  }
+
+  function isFile (stat) {
+    return !stat.isDirectory();
+  }
+
+  beforeEach(function() {
+    onAdd.reset();
+    onUpdate.reset();
+    onRemove.reset();
+  });
   before(function (done) {
     mkdirp(testDir, function (err) {
       if (err) return done(err);
@@ -17,74 +39,90 @@ describe('basic test', function () {
       assert.equal(files.length, 0);
       done();
     });
+    s.on('all', onAll);
+    s.on('add', onAdd);
+    s.on('update', onUpdate);
+    s.on('remove', onRemove);
+    s.on('error', onError);
   });
   after(function (done) {
     rimraf(testDir, done);
   });
   it('listens for file', function (done) {
-    s.once('add', function (p, stat) {
-      assert.equal(p, testDir + '/beans');
-      assert(!stat.isDirectory());
+    fs.writeFile(testDir + '/beans', 'beans', assert.ifError);
+    wait(function () {
+      assertCalledOnce(onAdd);
+      assertCalledWithMatch(onAdd, testDir + '/beans', isFile);
+      assertNotCalled(onUpdate);
+      assertNotCalled(onRemove);
       done();
     });
-    fs.writeFile(testDir + '/beans', 'beans', assert.ifError);
   });
   it('listens for new dirs', function (done) {
-    var list = [];
-    function listener (p, stat) {
-      list.push(p);
-      assert(stat.isDirectory());
-    }
-    s.on('add', listener);
     mkdirp(testDir + '/rice/beans');
-    setTimeout(function () {
-      s.removeListener('add', listener);
-      assert.deepEqual(list.sort(), [
-        testDir + '/rice',
-        testDir + '/rice/beans'
-      ]);
+    wait(function () {
+      assertCalledTwice(onAdd);
+      assertCalledWithMatch(onAdd, testDir + '/rice', isDir);
+      assertCalledWithMatch(onAdd, testDir + '/rice/beans', isDir);
+      assertNotCalled(onUpdate);
+      assertNotCalled(onRemove);
       done();
-    }, 1000);
+    });
   });
   it('listens for new file in sub dir', function (done) {
-    s.once('add', function (p, stat) {
-      assert.equal(p, testDir + '/rice/beans/meat');
-      assert(!stat.isDirectory());
+    fs.writeFile(testDir + '/rice/beans/meat', 'meat is neat', assert.ifError);
+    wait(function () {
+      assertCalledOnce(onAdd);
+      assertCalledWithMatch(onAdd, testDir + '/rice/beans/meat', isFile);
+      assertCalledOnce(onUpdate);
+      assertCalledWithMatch(onUpdate, testDir + '/rice/beans', isDir);
+      assertNotCalled(onRemove);
       done();
     });
-    fs.writeFile(testDir + '/rice/beans/meat', 'meat is neat', assert.ifError);
   });
   it('listens for another new file', function (done) {
-    s.once('add', function (p, stat) {
-      assert.equal(p, testDir + '/rice/taters');
-      assert(!stat.isDirectory());
+    fs.writeFile(testDir + '/rice/taters', 'tater treats', assert.ifError);
+    wait(function () {
+      assertCalledOnce(onAdd);
+      assertCalledWithMatch(onAdd, testDir + '/rice/taters', isFile);
+      assertCalledOnce(onUpdate);
+      assertCalledWithMatch(onUpdate, testDir + '/rice', isDir);
+      assertNotCalled(onRemove);
       done();
     });
-    fs.writeFile(testDir + '/rice/taters', 'tater treats', assert.ifError);
   });
   it('detects rimraf', function (done) {
-    var list = [];
-    function listener (p, stat) {
-      var args = [].slice.call(arguments);
-      list.push([p, stat.isDirectory()]);
-    }
-    s.on('remove', listener);
     rimraf(testDir + '/rice', assert.ifError);
-    setTimeout(function () {
-      s.removeListener('remove', listener);
-      assert.deepEqual(list.sort(), [
-        [testDir + '/rice', true],
-        [testDir + '/rice/beans', true],
-        [testDir + '/rice/beans/meat', false],
-        [testDir + '/rice/taters', false]
-      ]);
+    wait(function () {
+      assert.equal(onRemove.callCount, 4);
+      assertCalledWithMatch(onRemove, testDir + '/rice', isDir);
+      assertCalledWithMatch(onRemove, testDir + '/rice/beans', isDir);
+      assertCalledWithMatch(onRemove, testDir + '/rice/beans/meat', isFile);
+      assertCalledWithMatch(onRemove, testDir + '/rice/taters', isFile);
+      assertNotCalled(onAdd);
+      assertNotCalled(onUpdate);
       done();
-    }, 1000);
+    });
   });
-  it('detects single remove');
+  it('detects single remove', function (done) {
+    fs.unlink(testDir + '/beans', assert.ifError);
+    wait(function () {
+      assertCalledOnce(onRemove);
+      assertCalledWithMatch(onRemove, testDir + '/beans', isFile);
+      assertNotCalled(onAdd);
+      assertNotCalled(onUpdate);
+      done();
+    });
+  });
+  it('another mkdirp', function (done) {
+    done();
+  });
   it('detects remove of empty dir');
   it('detects update');
   it('detects add after remove');
   it('multiple saws'); // assert 'ready' files is populated
-  it('unwatch');
+  it('unwatch', function (done) {
+    s.close();
+    done();
+  });
 });

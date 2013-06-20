@@ -6,3 +6,5 @@ rimraf = require('rimraf');
 idgen = require('idgen');
 fs = require('graceful-fs');
 path = require('path');
+sinon = require('sinon');
+sinon.assert.expose(global);
