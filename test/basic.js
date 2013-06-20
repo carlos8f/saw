@@ -13,7 +13,10 @@ describe('basic test', function () {
     });
   });
   before(function (done) {
-    s = saw(testDir).on('ready', done);
+    s = saw(testDir).on('ready', function (files) {
+      assert.equal(files.length, 0);
+      done();
+    });
   });
   after(function (done) {
     rimraf(testDir, done);
@@ -82,6 +85,6 @@ describe('basic test', function () {
   it('detects remove of empty dir');
   it('detects update');
   it('detects add after remove');
-  it('multiple saws');
+  it('multiple saws'); // assert 'ready' files is populated
   it('unwatch');
 });

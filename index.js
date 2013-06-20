@@ -70,8 +70,8 @@ function saw (dir, options) {
 
     readdirp({root: dir}, function (errors, res) {
       if (errors) return onErr(errors);
-      var files = res.directories.concat(res.files);
       if (num !== scanNum) return; // there is a new scan running, abort
+      var files = res.directories.concat(res.files);
       // copy cache for later comparison
       var lastFiles = Object.keys(cache).map(function (k) {
         return cache[k];
@@ -107,7 +107,7 @@ function saw (dir, options) {
 
       if (!ready) {
         ready = true;
-        emitter.emit('ready');
+        emitter.emit('ready', files);
       }
     });
   }
