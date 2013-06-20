@@ -15,7 +15,7 @@ Enjoy.
 ```js
 var saw = require('saw');
 
-saw('path/to/dir')
+saw('path/to/dir', {options: 'are optional'})
   .on('ready', function () {
     // watcher is active
   })
@@ -34,6 +34,18 @@ saw('path/to/dir')
   })
   // to unwatch all files, call close():
   .close()
+```
+
+## Options
+
+- `delay` (Number, default: `0`), number of milliseconds to wait between a file
+  system change and a scan of the root. Raising the delay can help minimize the
+  redundancy of scans if the filesystem gets very busy (such as mass copies or
+  deletes).
+- `delayLimit` (Number, default: `100`), number of filesystem changes seen to force
+  a scan of the root (when using `delay`).
+- `persistent` (Boolean, default: `true`), whether or not to keep the process
+  open when watching is active.
 
 - - -
 
