@@ -3,7 +3,14 @@ describe('basic test', function () {
     , s
 
   before(function (done) {
-    mkdirp(testDir, done);
+    mkdirp(testDir, function (err) {
+      if (err) return done(err);
+      fs.realpath(testDir, function (err, resolvedPath) {
+        if (err) return done(err);
+        testDir = resolvedPath;
+        done();
+      });
+    });
   });
   before(function (done) {
     s = saw(testDir).on('ready', done);

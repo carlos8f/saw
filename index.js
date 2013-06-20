@@ -1,8 +1,8 @@
 var fs = require('graceful-fs')
-  , path = require('path')
+  , sep = require('path').sep
   , EventEmitter = require('events').EventEmitter
   , batcher = require('batcher')
-  , readDir = require('./readDir')
+  , readdirp = require('readdirp')
 
 function saw (dir, options) {
   if (typeof dir === 'object') {
@@ -31,11 +31,16 @@ function saw (dir, options) {
   }
 
   function onErr (err) {
+    if (Array.isArray(err)) {
+      err.forEach(onErr);
+      return;
+    }
+    if (err.code === 'ENOENT') return;
     emitter.emit('error', err);
   }
 
   function cacheKey (file) {
-    return 'file:' + file.path + (file.stat.isDirectory() ? path.sep : '');
+    return 'file:' + file.fullPath + (file.stat.isDirectory() ? sep : '');
   }
 
   function onChange () {
@@ -63,8 +68,9 @@ function saw (dir, options) {
     var num = ++scanNum;
     var keys = [];
 
-    readDir(dir, {stat: true}, function (err, files) {
-      if (err) return onErr(err);
+    readdirp({root: dir}, function (errors, res) {
+      if (errors) return onErr(errors);
+      var files = res.directories.concat(res.files);
       if (num !== scanNum) return; // there is a new scan running, abort
       // copy cache for later comparison
       var lastFiles = Object.keys(cache).map(function (k) {
@@ -75,15 +81,15 @@ function saw (dir, options) {
         keys.push(key);
 
         if (typeof cache[key] === 'undefined') {
-          emitter.emit('add', file.path, file.stat);
-          emitter.emit('all', 'add', file.path, file.stat);
+          emitter.emit('add', file.fullPath, file.stat);
+          emitter.emit('all', 'add', file.fullPath, file.stat);
           if (file.stat.isDirectory()) {
-            file.watcher = createWatcher(file.path);
+            file.watcher = createWatcher(file.fullPath);
           }
         }
         else if (cache[key].stat.mtime.getTime() !== file.stat.mtime.getTime()) {
-          emitter.emit('update', file.path, file.stat);
-          emitter.emit('all', 'update', file.path, file.stat);
+          emitter.emit('update', file.fullPath, file.stat);
+          emitter.emit('all', 'update', file.fullPath, file.stat);
         }
         cache[key] = file;
       });
@@ -92,8 +98,8 @@ function saw (dir, options) {
       lastFiles.forEach(function (file) {
         var key = cacheKey(file);
         if (!~keys.indexOf(key)) {
-          emitter.emit('remove', file.path, file.stat);
-          emitter.emit('all', 'remove', file.path, file.stat);
+          emitter.emit('remove', file.fullPath, file.stat);
+          emitter.emit('all', 'remove', file.fullPath, file.stat);
           if (file.watcher) file.watcher.close();
           delete cache[key];
         }

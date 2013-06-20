@@ -5,7 +5,8 @@
   "main": "index.js",
   "dependencies": {
     "batcher": "0.0.2",
-    "graceful-fs": "~1.2.2"
+    "graceful-fs": "~1.2.2",
+    "readdirp": "~0.2.4"
   },
   "devDependencies": {
     "mocha": "*",
