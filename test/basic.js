@@ -52,7 +52,7 @@ describe('basic test', function () {
     });
     fs.writeFile(testDir + '/rice/taters', 'tater treats', assert.ifError);
   });
-  it('detects remove', function (done) {
+  it('detects rimraf', function (done) {
     var list = [];
     function listener (p, stat) {
       var args = [].slice.call(arguments);
@@ -62,7 +62,6 @@ describe('basic test', function () {
     rimraf(testDir + '/rice', assert.ifError);
     setTimeout(function () {
       s.removeListener('remove', listener);
-      console.log(list.sort());
       assert.deepEqual(list.sort(), [
         [testDir + '/rice', true],
         [testDir + '/rice/beans', true],
@@ -72,7 +71,10 @@ describe('basic test', function () {
       done();
     }, 1000);
   });
+  it('detects single remove');
+  it('detects remove of empty dir');
   it('detects update');
   it('detects add after remove');
-
+  it('multiple saws');
+  it('unwatch');
 });
