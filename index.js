@@ -1,5 +1,6 @@
 var fs = require('graceful-fs')
   , sep = require('path').sep
+  , relative = require('path').relative
   , EventEmitter = require('events').EventEmitter
   , batcher = require('batcher')
   , readdirp = require('readdirp')
@@ -83,6 +84,8 @@ function saw (root, options) {
       if (errors) return onErr(errors);
       var files = res.directories.concat(res.files);
       files.forEach(function (file) {
+        file.path = relative(root, file.fullPath);
+        file.parentDir = relative(root, file.fullParentDir);
         var key = cacheKey(file);
         keys.push(key);
 

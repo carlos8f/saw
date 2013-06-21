@@ -36,7 +36,7 @@ basicTest = function (title, options) {
 
     function matchEntry (p, statMatcher) {
       return function (file) {
-        return file.fullPath === testDir + '/' + p && statMatcher(file.stat);
+        return file.fullPath === testDir + '/' + p && file.path === p && statMatcher(file.stat);
       };
     }
 
