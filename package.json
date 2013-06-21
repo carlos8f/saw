@@ -1,6 +1,6 @@
 {
   "name": "saw",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "actually working file tree watching library",
   "main": "index.js",
   "dependencies": {
