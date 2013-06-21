@@ -22,12 +22,20 @@ function saw (root, options) {
   if (options.delay) {
     var batch = batcher({
       batchSize: options.delayLimit,
-      batchTimeMs: options.delay
+      batchTimeMs: options.delay,
+      encoder: function (x) { return x; }
     });
     batch
       .on('data', function (data) {
-        //console.log('data', data);
-        // @todo: test delay option
+        var bases = [];
+        data.forEach(function (dir) {
+          if (bases.every(function (base) {
+            return !~dir.indexOf(base + sep);
+          })) {
+            if (!~bases.indexOf(dir)) bases.push(dir);
+          }
+        });
+        bases.forEach(scan);
       })
       .on('error', emitter.emit.bind(emitter, 'error'))
       .resume()
@@ -47,7 +55,7 @@ function saw (root, options) {
   }
 
   function onChange (dir) {
-    if (options.delay) batch.write(dir);
+    if (options.delay) batch.write(dir || root);
     else scan(dir || root);
   }
 
@@ -113,6 +121,7 @@ function saw (root, options) {
         ready = true;
         emitter.emit('ready', files);
       }
+      emitter.emit('scan', dir, files);
     });
   }
 
