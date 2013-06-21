@@ -9,30 +9,30 @@ path = require('path');
 sinon = require('sinon');
 sinon.assert.expose(global);
 
+instrument = function (s) {
+  ['all', 'add', 'update', 'remove', 'error', 'scan'].forEach(function (ev) {
+    var name = 'on' + ev.slice(0, 1).toUpperCase() + ev.slice(1);
+    s[name] = sinon.spy();
+    s.on(ev, s[name]);
+  });
+}
+
+wait = function (cb) {
+  setTimeout(cb, 1000);
+}
+
+isDir = function (stat) {
+  return stat.isDirectory();
+}
+
+isFile = function (stat) {
+  return !stat.isDirectory();
+}
+
 basicTest = function (title, options) {
   describe(title, function () {
     var testDir = '/tmp/saw-test-' + idgen()
       , s, s2
-
-    function instrument (s) {
-      ['all', 'add', 'update', 'remove', 'error', 'scan'].forEach(function (ev) {
-        var name = 'on' + ev.slice(0, 1).toUpperCase() + ev.slice(1);
-        s[name] = sinon.spy();
-        s.on(ev, s[name]);
-      });
-    }
-
-    function wait (cb) {
-      setTimeout(cb, 1000);
-    }
-
-    function isDir (stat) {
-      return stat.isDirectory();
-    }
-
-    function isFile (stat) {
-      return !stat.isDirectory();
-    }
 
     function matchEntry (p, statMatcher) {
       return function (file) {
