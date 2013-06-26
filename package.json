@@ -6,7 +6,7 @@
   "dependencies": {
     "batcher": "0.0.2",
     "graceful-fs": "~1.2.2",
-    "readdirp": "carlos8f/readdirp"
+    "readdirp": "~0.3.0"
   },
   "devDependencies": {
     "mocha": "*",
