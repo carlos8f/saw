@@ -100,6 +100,9 @@ The `file` object is the same as returned by
   a scan of the root (for use with `delay`).
 - `persistent` (Boolean, default: `true`), whether or not to keep the process
   open when watching is active.
+- `poll` (Numer, default: `2000`), interval between "straggler" scans in
+  milliseconds. Set to `false` to disable. Can be useful to correct for race
+  conditions due to recursive directory copies.
 
 - - -
 

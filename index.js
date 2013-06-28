@@ -19,6 +19,7 @@ function saw (root, options) {
     , cache = {}
     , ready = false
     , watchers = {}
+    , closed = false
 
   if (options.delay) {
     var batch = batcher({
@@ -78,6 +79,7 @@ function saw (root, options) {
   }
 
   function scan (dir) {
+    if (closed) return;
     var keys = [];
 
     readdirp({root: dir}, function (errors, res) {
@@ -133,10 +135,12 @@ function saw (root, options) {
     Object.keys(watchers).forEach(function (k) {
       watchers[k].close();
     });
+    closed = true;
   };
 
   watchers['file:' + root + sep] = createWatcher(root);
   process.nextTick(onChange);
+  if (options.poll) setInterval(onChange, options.poll);
 
   return emitter;
 }
