@@ -19,7 +19,7 @@ describe('dotfile', function () {
     });
   });
   before(function (done) {
-    s = saw(testDir).on('ready', function (files) {
+    s = saw(testDir, {poll: 1000}).on('ready', function (files) {
       assert.equal(files.length, 0);
       done();
     });

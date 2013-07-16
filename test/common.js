@@ -18,7 +18,7 @@ instrument = function (s) {
 }
 
 wait = function (cb) {
-  setTimeout(cb, 1000);
+  setTimeout(cb, 2000);
 }
 
 isDir = function (stat) {
