@@ -8,6 +8,7 @@ fs = require('graceful-fs');
 path = require('path');
 sinon = require('sinon');
 sinon.assert.expose(global);
+tmpDir = require('os').tmpDir();
 
 instrument = function (s) {
   ['all', 'add', 'update', 'remove', 'error', 'scan'].forEach(function (ev) {
@@ -31,7 +32,7 @@ isFile = function (stat) {
 
 basicTest = function (title, options) {
   describe(title, function () {
-    var testDir = '/tmp/saw-test-' + idgen()
+    var testDir = tmpDir + '/saw-test-' + idgen()
       , s, s2
 
     function matchEntry (p, statMatcher) {
