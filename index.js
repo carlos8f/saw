@@ -1,76 +1,53 @@
-var fs = require('graceful-fs')
-  , sep = require('path').sep
-  , relative = require('path').relative
+var path = require('path')
+  , fs = require('fs')
   , EventEmitter = require('events').EventEmitter
-  , batcher = require('batcher')
-  , readdirp = require('readdirp')
+  , glob = require('glob')
+  , LRU = require('lru-cache')
+  , minimatch = require('minimatch')
 
-function saw (root, options) {
-  if (typeof root === 'object') {
-    options = root;
-    root = null;
+function saw (pattern, options) {
+  if (pattern && pattern.constructor === Object) {
+    options = pattern;
+    pattern = null;
   }
-  root || (root = process.cwd());
   options || (options = {});
-  options.delay || (options.delay = 0);
-  options.delayLimit || (options.delayLimit = 100);
+  if (Array.isArray(pattern)) pattern = '{' + (pattern.join(',')) + '}';
+  else if (!pattern) pattern = '.';
 
-  var emitter = new EventEmitter()
-    , cache = {}
-    , ready = false
-    , watchers = {}
-    , closed = false
-
-  if (options.delay) {
-    var batch = batcher({
-      batchSize: options.delayLimit,
-      batchTimeMs: options.delay,
-      encoder: function (x) { return x; }
-    });
-    batch
-      .on('data', function (data) {
-        var bases = [];
-        data.forEach(function (dir) {
-          if (bases.every(function (base) {
-            return !~dir.indexOf(base + sep);
-          })) {
-            if (!~bases.indexOf(dir)) bases.push(dir);
-          }
-        });
-        bases.forEach(scan);
-      })
-      .on('error', emitter.emit.bind(emitter, 'error'))
-      .resume()
+  try {
+    var stat = fs.statSync(pattern);
+    if (stat && stat.isDirectory()) {
+      options.cwd || (options.cwd = path.resolve(pattern));
+      pattern = pattern.replace(path.sep, '/');
+      pattern = '{' + pattern + ',' + pattern + '/**/*}';
+    }
   }
+  catch (e) {}
+
+  var emitter = new EventEmitter();
+  emitter.cwd = options.cwd || path.resolve(process.cwd());
+  emitter.ready = false;
+  emitter.scanning = false;
+  emitter.cache = LRU(options.cache || {});
+  emitter.scan = scan;
+  emitter.closed = false;
 
   function onErr (err) {
-    if (Array.isArray(err)) {
-      err.forEach(onErr);
-      return;
-    }
     if (err.code === 'ENOENT') return;
     emitter.emit('error', err);
   }
 
   function cacheKey (file) {
-    return 'file:' + file.fullPath + (file.stat.isDirectory() ? sep : '');
+    return 'file:' + file.fullPath + (file.stat.isDirectory() ? path.sep : '');
   }
 
-  function onChange (dir) {
-    if (options.delay) batch.write(dir || root);
-    else scan(dir || root);
-  }
-
-  function createWatcher (p, parentDir) {
+  function createWatcher (p) {
     function onErr (err) {
       if (err.code !== 'ENOENT') emitter.emit('error', err);
     }
     try {
       return fs.watch(p, {persistent: options.persistent})
-        .on('change', function () {
-          // arguments passed to this function are useless.
-          onChange(parentDir);
-        })
+        .on('change', scan)
         .on('error', onErr)
     }
     catch (err) {
@@ -78,69 +55,122 @@ function saw (root, options) {
     }
   }
 
-  function scan (dir) {
-    if (closed) return;
+  function scan () {
+    if (emitter.scanning) {
+      if (!emitter.ready) emitter.once('ready', scan);
+      else emitter.once('scan', scan);
+      return false;
+    }
+    if (emitter.closed) return false;
+    emitter.scanning = true;
     var keys = [];
+    var latch = 1;
 
-    readdirp({root: dir}, function (errors, res) {
-      if (errors) return onErr(errors);
-      var files = res.directories.concat(res.files);
-      files.forEach(function (file) {
-        file.path = relative(root, file.fullPath);
-        file.parentDir = relative(root, file.fullParentDir);
-        var key = cacheKey(file);
-        keys.push(key);
-
-        if (typeof cache[key] === 'undefined') {
-          if (ready) {
-            emitter.emit('add', file);
-            emitter.emit('all', 'add', file);
-          }
-          watchers[key] = createWatcher(file.fullPath, file.fullParentDir);
-        }
-        else if (cache[key].stat.mtime.getTime() !== file.stat.mtime.getTime()) {
-          emitter.emit('update', file);
-          emitter.emit('all', 'update', file);
-        }
-
-        cache[key] = file;
-      });
-
-      // see if any previously seen files are missing from the tree
-      Object.keys(cache).forEach(function (key) {
-        var file = cache[key];
-        if (file.fullPath.indexOf(dir + sep) !== 0) return;
-
+    function cleanup () {
+      var files = [];
+      emitter.cache.forEach(function (file, key) {
+        if (file.deleted) return;
         if (!~keys.indexOf(key)) {
+          file.watcher.close();
+          file.deleted = true;
           emitter.emit('remove', file);
           emitter.emit('all', 'remove', file);
-          if (watchers[key]) {
-            watchers[key].close();
-            delete watchers[key];
+          var dirPath = path.dirname(file.fullPath);
+          if (dirPath !== emitter.cwd && minimatch(dirPath, pattern)) {
+            latch++;
+            fs.stat(dirPath, function (err, stat) {
+              if (err) {
+                onErr(err);
+                if (!--latch) end();
+                return;
+              }
+              onStat(dirPath, stat, true);
+              if (!--latch) end();
+            });
           }
-          delete cache[key];
+          emitter.cache.set(key, file);
         }
+        if (file.fullPath !== options.cwd) files.push(file);
       });
+      return files;
+    }
 
-      if (!ready && dir === root) {
-        ready = true;
-        emitter.emit('ready', files);
+    function end () {
+      var files = cleanup();
+      if (!latch) {
+        emitter.scanning = false;
+        emitter.emit('scan', files);
+        if (!latch && !emitter.ready) {
+          emitter.ready = true;
+          emitter.emit('ready', files);
+        }
       }
-      emitter.emit('scan', dir, files);
-    });
+    }
+
+    function onStat (p, stat, forceUpdate) {
+      var file = {
+        path: path.relative(emitter.cwd, p),
+        fullPath: path.resolve(p),
+        stat: stat
+      };
+      var key = cacheKey(file);
+      if (!forceUpdate && ~keys.indexOf(key)) return;
+      keys.push(key);
+      var cached = emitter.cache.get(key);
+      var op = 'noop';
+      if (forceUpdate || (cached && cached.stat.isFile() && cached.stat.mtime.getTime() !== file.stat.mtime.getTime())) {
+        if (!cached || cached.deleted) file.watcher = createWatcher(file.fullPath);
+        else file.watcher = cached.watcher;
+        op = 'update';
+      }
+      else if (!cached || cached.deleted) {
+        op = 'add';
+        file.watcher = createWatcher(file.fullPath);
+      }
+      if (op !== 'noop') {
+        emitter.cache.set(key, file);
+        if (emitter.ready && file.fullPath !== emitter.cwd) {
+          emitter.emit(op, file);
+          emitter.emit('all', op, file);
+          if (file.stat.isFile()) {
+            var dirPath = path.dirname(file.fullPath);
+            if (dirPath !== emitter.cwd && minimatch(dirPath, pattern)) {
+              latch++;
+              fs.stat(dirPath, function (err, stat) {
+                if (err) {
+                  onErr(err);
+                  if (!--latch) end();
+                  return;
+                }
+                onStat(dirPath, stat, true);
+                if (!--latch) end();
+              });
+            }
+          }
+        }
+      }
+    }
+
+    var search = glob(pattern, {stat: true, cwd: emitter.cwd, dot: options.dot})
+      .on('error', onErr)
+      .on('stat', onStat)
+      .on('end', function () {
+        if (!--latch) end();
+      });
   }
 
   emitter.close = function () {
     // unwatch all
-    Object.keys(watchers).forEach(function (k) {
-      watchers[k].close();
+    emitter.cache.forEach(function (file, key) {
+      if (file.deleted) return;
+      file.watcher.close();
+      file.deleted = true;
+      emitter.cache.set(key, file);
     });
-    closed = true;
+    emitter.closed = true;
   };
 
-  watchers['file:' + root + sep] = createWatcher(root);
-  process.nextTick(onChange);
-  if (options.poll) setInterval(onChange, options.poll);
+  setImmediate(scan);
 
   return emitter;
 }
