@@ -176,7 +176,10 @@ Saw.prototype.close = function () {
   // unwatch all
   this.cache.forEach(function (file, key) {
     if (file.deleted) return;
-    file.watcher.close();
+    try {
+      file.watcher.close();
+    }
+    catch (e) {}
     file.deleted = true;
     self.cache.set(key, file);
   });
