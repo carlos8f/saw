@@ -4,8 +4,10 @@ var path = require('path')
   , glob = require('glob')
   , LRU = require('lru-cache')
   , minimatch = require('minimatch')
+  , inherits = require('util').inherits
 
-function saw (pattern, options) {
+function Saw (pattern, options) {
+  EventEmitter.call(this);
   if (pattern && pattern.constructor === Object) {
     options = pattern;
     pattern = null;
@@ -24,155 +26,161 @@ function saw (pattern, options) {
   }
   catch (e) {}
 
-  var emitter = new EventEmitter();
-  emitter.cwd = options.cwd || path.resolve(process.cwd());
-  emitter.ready = false;
-  emitter.scanning = false;
-  emitter.cache = LRU(options.cache || {});
-  emitter.scan = scan;
-  emitter.closed = false;
+  this.pattern = pattern;
+  this.options = options;
+  this.cwd = options.cwd || path.resolve(process.cwd());
+  this.ready = false;
+  this.scanning = false;
+  this.cache = LRU(options.cache || {});
+  this.closed = false;
 
-  function onErr (err) {
-    if (err.code === 'ENOENT') return;
-    emitter.emit('error', err);
+  var self = this;
+  Object.keys(Saw.prototype).forEach(function (method) {
+    self[method] = Saw.prototype[method].bind(self);
+  });
+
+  setImmediate(this.scan);
+}
+inherits(Saw, EventEmitter);
+
+Saw.prototype.onErr = function (err) {
+  if (err.code !== 'ENOENT') this.emit('error', err);
+};
+
+Saw.prototype.getCacheKey = function (file) {
+  return 'file:' + file.fullPath + (file.stat.isDirectory() ? path.sep : '');
+};
+
+Saw.prototype.createWatcher = function (p) {
+  try {
+    return fs.watch(p, {persistent: this.options.persistent})
+      .on('change', this.scan)
+      .on('error', this.onErr);
   }
-
-  function cacheKey (file) {
-    return 'file:' + file.fullPath + (file.stat.isDirectory() ? path.sep : '');
+  catch (err) {
+    this.onErr(err);
   }
+};
 
-  function createWatcher (p) {
-    function onErr (err) {
-      if (err.code !== 'ENOENT') emitter.emit('error', err);
-    }
-    try {
-      return fs.watch(p, {persistent: options.persistent})
-        .on('change', scan)
-        .on('error', onErr)
-    }
-    catch (err) {
-      onErr(err);
-    }
+Saw.prototype.scan = function () {
+  if (this.scanning) {
+    if (!this.ready) this.once('ready', scan);
+    else this.once('scan', this.scan);
+    return false;
   }
+  if (this.closed) return false;
+  this.scanning = true;
+  this.keys = [];
+  this.latch = 1;
+  var self = this;
+  glob(this.pattern, {stat: true, cwd: this.cwd, dot: this.options.dot})
+    .on('error', this.onErr)
+    .on('stat', this.onStat)
+    .on('end', function () {
+      if (!--self.latch) self.onEnd();
+    });
+};
 
-  function scan () {
-    if (emitter.scanning) {
-      if (!emitter.ready) emitter.once('ready', scan);
-      else emitter.once('scan', scan);
-      return false;
-    }
-    if (emitter.closed) return false;
-    emitter.scanning = true;
-    var keys = [];
-    var latch = 1;
-
-    function cleanup () {
-      var files = [];
-      emitter.cache.forEach(function (file, key) {
-        if (file.deleted) return;
-        if (!~keys.indexOf(key)) {
-          file.watcher.close();
-          file.deleted = true;
-          emitter.emit('remove', file);
-          emitter.emit('all', 'remove', file);
-          var dirPath = path.dirname(file.fullPath);
-          if (dirPath !== emitter.cwd && minimatch(dirPath, pattern)) {
-            latch++;
-            fs.stat(dirPath, function (err, stat) {
-              if (err) {
-                onErr(err);
-                if (!--latch) end();
-                return;
-              }
-              onStat(dirPath, stat, true);
-              if (!--latch) end();
-            });
-          }
-          emitter.cache.set(key, file);
-        }
-        if (file.fullPath !== options.cwd) files.push(file);
-      });
-      return files;
-    }
-
-    function end () {
-      var files = cleanup();
-      if (!latch) {
-        emitter.scanning = false;
-        emitter.emit('scan', files);
-        if (!latch && !emitter.ready) {
-          emitter.ready = true;
-          emitter.emit('ready', files);
-        }
-      }
-    }
-
-    function onStat (p, stat, forceUpdate) {
-      var file = {
-        path: path.relative(emitter.cwd, p),
-        fullPath: path.resolve(p),
-        stat: stat
-      };
-      var key = cacheKey(file);
-      if (!forceUpdate && ~keys.indexOf(key)) return;
-      keys.push(key);
-      var cached = emitter.cache.get(key);
-      var op = 'noop';
-      if (forceUpdate || (cached && cached.stat.isFile() && cached.stat.mtime.getTime() !== file.stat.mtime.getTime())) {
-        if (!cached || cached.deleted) file.watcher = createWatcher(file.fullPath);
-        else file.watcher = cached.watcher;
-        op = 'update';
-      }
-      else if (!cached || cached.deleted) {
-        op = 'add';
-        file.watcher = createWatcher(file.fullPath);
-      }
-      if (op !== 'noop') {
-        emitter.cache.set(key, file);
-        if (emitter.ready && file.fullPath !== emitter.cwd) {
-          emitter.emit(op, file);
-          emitter.emit('all', op, file);
-          if (file.stat.isFile()) {
-            var dirPath = path.dirname(file.fullPath);
-            if (dirPath !== emitter.cwd && minimatch(dirPath, pattern)) {
-              latch++;
-              fs.stat(dirPath, function (err, stat) {
-                if (err) {
-                  onErr(err);
-                  if (!--latch) end();
-                  return;
-                }
-                onStat(dirPath, stat, true);
-                if (!--latch) end();
-              });
-            }
-          }
-        }
-      }
-    }
-
-    var search = glob(pattern, {stat: true, cwd: emitter.cwd, dot: options.dot})
-      .on('error', onErr)
-      .on('stat', onStat)
-      .on('end', function () {
-        if (!--latch) end();
-      });
-  }
-
-  emitter.close = function () {
-    // unwatch all
-    emitter.cache.forEach(function (file, key) {
-      if (file.deleted) return;
+Saw.prototype.cleanup = function () {
+  var files = [];
+  var self = this;
+  this.cache.forEach(function (file, key) {
+    if (file.deleted) return;
+    if (!~self.keys.indexOf(key)) {
       file.watcher.close();
       file.deleted = true;
-      emitter.cache.set(key, file);
-    });
-    emitter.closed = true;
+      self.emit('remove', file);
+      self.emit('all', 'remove', file);
+      var dirPath = path.dirname(file.fullPath);
+      if (dirPath !== self.cwd && minimatch(dirPath, self.pattern)) {
+        self.latch++;
+        fs.stat(dirPath, function (err, stat) {
+          if (err) {
+            self.onErr(err);
+            if (!--self.latch) self.onEnd();
+            return;
+          }
+          self.onStat(dirPath, stat, true);
+          if (!--self.latch) self.onEnd();
+        });
+      }
+      self.cache.set(key, file);
+    }
+    if (file.fullPath !== self.cwd) files.push(file);
+  });
+  return files;
+};
+
+Saw.prototype.onEnd = function () {
+  var files = this.cleanup();
+  if (!this.latch) {
+    this.scanning = false;
+    this.emit('scan', files);
+    if (!this.latch && !this.ready) {
+      this.ready = true;
+      this.emit('ready', files);
+    }
+  }
+};
+
+Saw.prototype.onStat = function (p, stat, forceUpdate) {
+  var self = this;
+  var file = {
+    path: path.relative(this.cwd, p),
+    fullPath: path.resolve(p),
+    stat: stat
   };
+  var key = this.getCacheKey(file);
+  if (!forceUpdate && ~this.keys.indexOf(key)) return;
+  this.keys.push(key);
+  var cached = this.cache.get(key);
+  var op = 'noop';
+  if (forceUpdate || (cached && cached.stat.isFile() && cached.stat.mtime.getTime() !== file.stat.mtime.getTime())) {
+    if (!cached || cached.deleted) file.watcher = this.createWatcher(file.fullPath);
+    else file.watcher = cached.watcher;
+    op = 'update';
+  }
+  else if (!cached || cached.deleted) {
+    op = 'add';
+    file.watcher = this.createWatcher(file.fullPath);
+  }
+  if (op !== 'noop') {
+    this.cache.set(key, file);
+    if (this.ready && file.fullPath !== this.cwd) {
+      this.emit(op, file);
+      this.emit('all', op, file);
+      if (file.stat.isFile()) {
+        var dirPath = path.dirname(file.fullPath);
+        if (dirPath !== this.cwd && minimatch(dirPath, this.pattern)) {
+          this.latch++;
+          fs.stat(dirPath, function (err, stat) {
+            if (err) {
+              onErr(err);
+              if (!--self.latch) self.onEnd();
+              return;
+            }
+            self.onStat(dirPath, stat, true);
+            if (!--self.latch) self.onEnd();
+          });
+        }
+      }
+    }
+  }
+};
 
-  setImmediate(scan);
+Saw.prototype.close = function () {
+  var self = this;
+  // unwatch all
+  this.cache.forEach(function (file, key) {
+    if (file.deleted) return;
+    file.watcher.close();
+    file.deleted = true;
+    self.cache.set(key, file);
+  });
+  this.closed = true;
+};
 
-  return emitter;
-}
-
-module.exports = saw;
+module.exports = function (pattern, options) {
+  return new Saw(pattern, options);
+};
+module.exports.Saw = Saw;

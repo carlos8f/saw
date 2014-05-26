@@ -6,8 +6,7 @@
   "dependencies": {
     "glob": "^4.0.0",
     "lru-cache": "^2.5.0",
-    "minimatch": "^0.3.0",
-    "rreaddir": "^0.1.1"
+    "minimatch": "^0.3.0"
   },
   "devDependencies": {
     "mocha": "*",
