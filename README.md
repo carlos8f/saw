@@ -87,22 +87,22 @@ saw('path/to/dir', {options: 'are optional'})
   .close()
 ```
 
-The `file` object is the same as returned by
-[readdirp](https://github.com/thlorenz/readdirp#entry-info).
+## Tips
+
+- You can also pass a [glob pattern](https://www.npmjs.org/package/glob) or array
+  of glob patterns as the first argument.
+- You can omit the first argument to watch the current working directory.
+- The `file` object is the same as returned by
+  [readdirp](https://github.com/thlorenz/readdirp#entry-info).
 
 ## Options
 
-- `delay` (Number, default: `0`), number of milliseconds to wait for a possible
-  batch of filesystem changes to complete before scanning of the root. Raising
-  the delay can help minimize the redundancy of scans if the filesystem gets very
-  busy (such as mass copies or deletes).
-- `delayLimit` (Number, default: `100`), number of filesystem changes to force
-  a scan of the root (for use with `delay`).
+- `cwd` (String, default: first argument or `process.cwd()` if first argument isn't a directory),
+  the directory to consider as root for relative paths.
 - `persistent` (Boolean, default: `true`), whether or not to keep the process
   open when watching is active.
-- `poll` (Number, default: `false`), interval between "straggler" scans in
-  milliseconds. Set to `false` to disable. Can be useful to correct for race
-  conditions due to recursive directory copies.
+- `dot` (Boolean, default: `false`), whether or not to watch dotfiles.
+- `cache` (Object), options to pass to [lru-cache](https://www.npmjs.org/package/lru-cache).
 
 - - -
 
@@ -114,8 +114,8 @@ strategy firm located in Aptos, CA and Washington, D.C.
 
 ### License: MIT
 
-- Copyright (C) 2013 Carlos Rodriguez (http://s8f.org/)
-- Copyright (C) 2013 Terra Eclipse, Inc. (http://www.terraeclipse.com/)
+- Copyright (C) 2013-14 Carlos Rodriguez (http://s8f.org/)
+- Copyright (C) 2013-14 Terra Eclipse, Inc. (http://www.terraeclipse.com/)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the &quot;Software&quot;), to deal
