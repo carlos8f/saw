@@ -4,7 +4,7 @@ saw = require('../');
 mkdirp = require('mkdirp');
 rimraf = require('rimraf');
 idgen = require('idgen');
-fs = require('graceful-fs');
+fs = require('fs');
 path = require('path');
 sinon = require('sinon');
 sinon.assert.expose(global);
