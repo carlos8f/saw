@@ -128,7 +128,10 @@ Saw.prototype.onStat = function (p, stat, forceUpdate) {
   var file = {
     path: path.relative(this.cwd, p),
     fullPath: path.resolve(p),
-    stat: stat
+    stat: stat,
+    name: path.basename(p),
+    parentDir: path.dirname(p),
+    fullParentDir: path.resolve(path.dirname(p))
   };
   var key = this.getCacheKey(file);
   if (!forceUpdate && ~this.keys.indexOf(key)) return;
