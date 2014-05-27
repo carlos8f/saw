@@ -64,7 +64,7 @@ Saw.prototype.createWatcher = function (p) {
 
 Saw.prototype.scan = function () {
   if (this.scanning) {
-    if (!this.ready) this.once('ready', scan);
+    if (!this.ready) this.once('ready', this.scan);
     else this.once('scan', this.scan);
     return false;
   }
