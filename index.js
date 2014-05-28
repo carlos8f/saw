@@ -13,7 +13,9 @@ function Saw (pattern, options) {
     pattern = null;
   }
   options || (options = {});
-  if (Array.isArray(pattern)) pattern = '{' + (pattern.join(',')) + '}';
+  if (Array.isArray(pattern)) {
+    pattern = pattern.length < 2 ? pattern[0] : '{' + (pattern.join(',')) + '}';
+  }
   else if (!pattern) pattern = '.';
 
   try {
