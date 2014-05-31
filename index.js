@@ -128,13 +128,13 @@ Saw.prototype.onEnd = function () {
 Saw.prototype.onStat = function (p, stat, forceUpdate) {
   var self = this;
   var file = {
-    path: path.relative(this.cwd, p),
-    fullPath: path.resolve(p),
+    path: path.resolve(this.cwd, p).replace(this.cwd + '/', ''),
+    fullPath: path.resolve(this.cwd, p),
     stat: stat,
-    name: path.basename(p),
-    parentDir: path.dirname(p),
-    fullParentDir: path.resolve(path.dirname(p))
+    name: path.basename(p)
   };
+  file.parentDir = path.dirname(file.path);
+  file.fullParentDir = path.dirname(file.fullPath);
   var key = this.getCacheKey(file);
   if (!forceUpdate && ~this.keys.indexOf(key)) return;
   this.keys.push(key);
